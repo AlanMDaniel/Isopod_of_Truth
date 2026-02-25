@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Neural Manifold Timing Simulator</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- React & ReactDOM -->
+    <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+    
+    <!-- Babel for in-browser JSX compilation -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body class="bg-slate-50 min-h-screen">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef, useMemo } = React;
+
+        const App = () => {
+          const [activeTab, setActiveTab] = useState('error'); 
+          const [isPlaying, setIsPlaying] = useState(false);
+          const [time, setTime] = useState(0);
+          const [networkWeight, setNetworkWeight] = useState(1.0); 
+          const [targetTime, setTargetTime] = useState(1500); 
+          const [trialComplete, setTrialComplete] = useState(false);
+          const [actualTime, setActualTime] = useState(0);
+          const [isApplyingFeedback, setIsApplyingFeedback] = useState(false);
+          
+          const [isAutoTraining, setIsAutoTraining] = useState(false);
+          const autoTrainingRef = useRef(false);
+          
+          const canvasRef = useRef(null);
+          const animationRef = useRef(null);
+          const startTimeRef = useRef(null);
+          
+          const neuromodulatorRef = useRef({ active: false, type: null, opacity: 0 });
+
+          const canvasWidth = 850;
+          const canvasHeight = 380;
+          
+          const trajectorySpeed = networkWeight * 0.04; 
+          const expectedTime = Math.round(2500 / networkWeight);
+
+          // Generate a topographic array of neurons, forward-projecting synapses, and AMPA slots
+          const { nodes, edges } = useMemo(() => {
+            const n = [];
+            const e = [];
+            
+            const minX = 430;
+            const maxX = 830;
+            const minY = 80;
+            const maxY = 340;
+            
+            const cols = 15;
+            const rows = 8;
+            const spacingX = (maxX - minX) / (cols - 1);
+            const spacingY = (maxY - minY) / (rows - 1);
+            
+            for (let c = 0; c < cols; c++) {
+              for (let r = 0; r < rows; r++) {
+                const jx = (Math.random() - 0.5) * spacingX * 0.4;
+                const jy = (Math.random() - 0.5) * spacingY * 0.4;
+                n.push({
+                  x: minX + c * spacingX + jx,
+                  y: minY + r * spacingY + jy,
+                  baseSize: 2.5,
+                  tuningPhase: (c / (cols - 1)) * 1.1, 
+                  id: `n${c}-${r}`,
+                  col: c
+                });
+              }
+            }
+
+            for (let i = 0; i < n.length; i++) {
+              for (let j = 0; j < n.length; j++) {
+                const colDiff = n[j].col - n[i].col;
+                const yDiff = Math.abs(n[j].y - n[i].y);
+                
+                if (colDiff > 0 && colDiff <= 2 && yDiff < 60 && Math.random() > 0.4) { 
+                  const phaseDiff = Math.abs(n[i].tuningPhase - n[j].tuningPhase);
+                  
+                  const ampaSites = [];
+                  for(let s=0; s<5; s++) {
+                    ampaSites.push({
+                      offset: 0.7 + Math.random() * 0.25, 
+                      jitterX: Math.random() * 5 - 2.5,
+                      jitterY: Math.random() * 5 - 2.5,
+                      activationThreshold: Math.random() // Uniform threshold for smooth global density changes
+                    });
+                  }
+                  e.push([n[i], n[j], phaseDiff, ampaSites]);
+                }
+              }
+            }
+            return { nodes: n, edges: e };
+          }, []);
+
+          const drawSimulation = (ctx, elapsed) => {
+            ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+            
+            ctx.fillStyle = '#f8fafc'; 
+            ctx.fillRect(0, 0, 400, canvasHeight);
+            
+            ctx.fillStyle = '#0f172a'; 
+            ctx.fillRect(400, 0, 450, canvasHeight);
+            
+            ctx.strokeStyle = '#cbd5e1';
+            ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.moveTo(400, 0); ctx.lineTo(400, canvasHeight); ctx.stroke();
+
+            ctx.fillStyle = '#334155';
+            ctx.font = 'bold 16px sans-serif';
+            ctx.fillText('1. Abstract State Space (Manifold)', 20, 30);
+            ctx.font = '12px sans-serif';
+            ctx.fillText('Neural Population Principal Components', 20, 50);
+
+            ctx.strokeStyle = '#94a3b8';
+            ctx.lineWidth = 1.5;
+            ctx.beginPath(); 
+            ctx.moveTo(40, 320); ctx.lineTo(360, 320); 
+            ctx.moveTo(40, 320); ctx.lineTo(40, 80);  
+            ctx.stroke();
+
+            let progress = (elapsed * trajectorySpeed) / 100;
+            progress = Math.min(progress, 1.1); 
+
+            ctx.strokeStyle = '#cbd5e1';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            for (let p = 0; p <= 1.0; p += 0.05) {
+              const px = 60 + p * 280;
+              const py = 300 - p * 150 + Math.sin(p * Math.PI) * -50;
+              if (p === 0) ctx.moveTo(px, py);
+              else ctx.lineTo(px, py);
+            }
+            ctx.stroke();
+
+            const stateX = 60 + progress * 280;
+            const stateY = 300 - progress * 150 + Math.sin(progress * Math.PI) * -50;
+            
+            if (elapsed > 0 || trialComplete) {
+              ctx.fillStyle = '#10b981';
+              ctx.beginPath(); ctx.arc(stateX, stateY, 8, 0, Math.PI * 2); ctx.fill();
+              ctx.shadowBlur = 10; ctx.shadowColor = '#10b981'; ctx.fill(); ctx.shadowBlur = 0;
+            }
+
+            const thresholdX = 60 + 1.0 * 280;
+            ctx.strokeStyle = '#ef4444';
+            ctx.setLineDash([5, 5]);
+            ctx.beginPath(); ctx.moveTo(thresholdX, 80); ctx.lineTo(thresholdX, 320); ctx.stroke();
+            ctx.setLineDash([]);
+
+            ctx.fillStyle = '#f8fafc';
+            ctx.font = 'bold 16px sans-serif';
+            ctx.fillText('2. Physical Cortical Array', 420, 30);
+            ctx.fillStyle = '#94a3b8';
+            ctx.font = '12px sans-serif';
+            ctx.fillText('Sequential wave propagation speed depends on available receptors', 420, 50);
+            
+            ctx.fillStyle = '#ef4444';
+            ctx.beginPath(); ctx.arc(424, 66, 3, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = '#94a3b8';
+            ctx.fillText('= Available AMPA Receptors (Controls Cascade Velocity)', 435, 70);
+
+            // Spread the visual receptor saturation curve so it doesn't max out too early
+            const ampaRatio = Math.max(0, Math.min(1, (networkWeight - 0.2) / 4.8));
+
+            ctx.lineWidth = 0.5;
+            edges.forEach(([n1, n2, phaseDiff, ampaSites]) => {
+              const dist1 = Math.abs(progress - n1.tuningPhase);
+              const dist2 = Math.abs(progress - n2.tuningPhase);
+              const isSynapseActive = dist1 < 0.15 && dist2 < 0.15 && (elapsed > 0 || trialComplete);
+              
+              if (isSynapseActive) {
+                ctx.strokeStyle = `rgba(52, 211, 153, ${1 - Math.max(dist1, dist2)/0.15})`; 
+              } else {
+                ctx.strokeStyle = 'rgba(51, 65, 85, 0.3)'; 
+              }
+              ctx.beginPath(); ctx.moveTo(n1.x, n1.y); ctx.lineTo(n2.x, n2.y); ctx.stroke();
+
+              ampaSites.forEach((site) => {
+                const px = n1.x + (n2.x - n1.x) * site.offset + site.jitterX;
+                const py = n1.y + (n2.y - n1.y) * site.offset + site.jitterY;
+                
+                ctx.beginPath();
+                ctx.arc(px, py, 1.2, 0, Math.PI * 2);
+                
+                if (ampaRatio >= site.activationThreshold) {
+                  ctx.fillStyle = isSynapseActive ? '#ef4444' : 'rgba(239, 68, 68, 0.4)'; 
+                } else {
+                  ctx.fillStyle = 'rgba(71, 85, 105, 0.15)'; 
+                }
+                ctx.fill();
+              });
+            });
+
+            nodes.forEach(node => {
+              const distToPhase = Math.abs(progress - node.tuningPhase);
+              let activation = 0;
+              
+              if ((elapsed > 0 || trialComplete) && distToPhase < 0.15) {
+                activation = 1 - (distToPhase / 0.15); 
+              }
+
+              ctx.beginPath();
+              ctx.arc(node.x, node.y, node.baseSize + (activation * 4), 0, Math.PI * 2);
+              
+              if (activation > 0.1) {
+                ctx.fillStyle = `rgba(16, 185, 129, ${0.4 + activation * 0.6})`;
+                ctx.shadowBlur = 12 * activation;
+                ctx.shadowColor = '#10b981';
+              } else if (progress > node.tuningPhase && (progress - node.tuningPhase) < 0.3 && (elapsed > 0 || trialComplete)) {
+                const tailAlpha = Math.max(0, 0.4 - ((progress - node.tuningPhase) / 0.3));
+                ctx.fillStyle = `rgba(56, 189, 248, ${tailAlpha})`; 
+                ctx.shadowBlur = 0;
+              } else {
+                ctx.fillStyle = '#1e293b'; 
+                ctx.shadowBlur = 0;
+              }
+              ctx.fill();
+            });
+            ctx.shadowBlur = 0;
+
+            if (neuromodulatorRef.current.active) {
+              const { type, opacity } = neuromodulatorRef.current;
+              ctx.globalCompositeOperation = 'screen';
+              
+              const color = type === 'burst' ? `rgba(16, 185, 129, ${opacity * 0.4})` : `rgba(239, 68, 68, ${opacity * 0.3})`;
+              
+              ctx.fillStyle = color;
+              ctx.fillRect(400, 0, 450, canvasHeight);
+              
+              ctx.fillStyle = type === 'burst' ? `rgba(52, 211, 153, ${opacity})` : `rgba(248, 113, 113, ${opacity})`;
+              for(let i=0; i<40; i++) {
+                const px = 450 + Math.random() * 350;
+                const py = 50 + Math.random() * 250;
+                ctx.beginPath(); ctx.arc(px, py, Math.random() * 3 + 1, 0, Math.PI*2); ctx.fill();
+              }
+              ctx.globalCompositeOperation = 'source-over';
+            }
+
+            if (progress >= 1.0) {
+              ctx.fillStyle = 'rgba(239, 68, 68, 0.2)';
+              ctx.fillRect(400, 0, 450, canvasHeight);
+              ctx.fillStyle = '#ef4444';
+              ctx.font = 'bold 20px sans-serif';
+              ctx.fillText('MOTOR ACTION', 550, canvasHeight / 2);
+            }
+          };
+
+          const updateSimulation = (timestamp) => {
+            if (!startTimeRef.current) startTimeRef.current = timestamp;
+            const elapsed = timestamp - startTimeRef.current;
+            
+            setTime(elapsed);
+
+            const canvas = canvasRef.current;
+            if (canvas) drawSimulation(canvas.getContext('2d'), elapsed);
+
+            const progress = (elapsed * trajectorySpeed) / 100;
+            
+            if (neuromodulatorRef.current.active) {
+              neuromodulatorRef.current.opacity -= 0.02;
+              if (neuromodulatorRef.current.opacity <= 0) {
+                neuromodulatorRef.current.active = false;
+              }
+            }
+
+            if (progress < 1.0 && isPlaying) {
+              animationRef.current = requestAnimationFrame(updateSimulation);
+            } else if (isPlaying) {
+              setIsPlaying(false);
+              setTrialComplete(true);
+              setActualTime(elapsed);
+            } else if (neuromodulatorRef.current.active) {
+              animationRef.current = requestAnimationFrame(updateSimulation);
+            }
+          };
+
+          useEffect(() => {
+            if (isPlaying || neuromodulatorRef.current.active) {
+              animationRef.current = requestAnimationFrame(updateSimulation);
+            }
+            return () => cancelAnimationFrame(animationRef.current);
+          }, [isPlaying]);
+
+          useEffect(() => {
+            const canvas = canvasRef.current;
+            if (canvas && !isPlaying && !trialComplete && time === 0 && !neuromodulatorRef.current.active) {
+              drawSimulation(canvas.getContext('2d'), 0);
+            }
+          }, [networkWeight, nodes, edges]);
+
+          useEffect(() => {
+            if (trialComplete && isAutoTraining && activeTab === 'error' && !isApplyingFeedback) {
+              const error = actualTime - targetTime;
+              
+              if (Math.abs(error) < 60) {
+                setIsAutoTraining(false);
+                autoTrainingRef.current = false;
+              } else {
+                const timer = setTimeout(() => {
+                  applyDopamineFeedback('auto', error);
+                }, 600);
+                return () => clearTimeout(timer);
+              }
+            }
+          }, [trialComplete, isAutoTraining, actualTime, targetTime, activeTab, isApplyingFeedback]);
+
+          const handleStart = () => {
+            setTime(0);
+            setActualTime(0);
+            setTrialComplete(false);
+            setIsApplyingFeedback(false);
+            startTimeRef.current = null;
+            neuromodulatorRef.current = { active: false, type: null, opacity: 0 };
+            setIsPlaying(true);
+          };
+
+          const applyDopamineFeedback = (actionType, error = 0) => {
+            setIsApplyingFeedback(true);
+            let newWeight = networkWeight;
+            let isBurst = true;
+            const lr = 0.0012; 
+            
+            // Cap the maximum weight change per trial to prevent instantly hitting the ceiling
+            const maxChange = 0.4;
+            
+            if (actionType === 'auto') {
+              const delta = Math.max(-maxChange, Math.min(maxChange, error * lr));
+              newWeight = networkWeight + delta;
+              isBurst = error > 0;
+            } else if (actionType === 'burst') {
+              const change = error !== 0 ? Math.min(Math.abs(error * lr), maxChange) : 0.15;
+              newWeight = networkWeight + change;
+              isBurst = true;
+            } else if (actionType === 'dip') {
+              const change = error !== 0 ? Math.min(Math.abs(error * lr), maxChange) : 0.15;
+              newWeight = networkWeight - change;
+              isBurst = false;
+            }
+            
+            // Expand the physical limits to allow timing down to 250ms (weight 10.0)
+            newWeight = Math.max(0.15, Math.min(newWeight, 10.0));
+            
+            neuromodulatorRef.current = { 
+              active: true, 
+              type: isBurst ? 'burst' : 'dip', 
+              opacity: 1.0 
+            };
+
+            setNetworkWeight(newWeight);
+            
+            cancelAnimationFrame(animationRef.current);
+            animationRef.current = requestAnimationFrame(updateSimulation);
+            
+            setTimeout(() => {
+              setTrialComplete(false);
+              setTime(0);
+              startTimeRef.current = null;
+              if (autoTrainingRef.current && activeTab === 'error') {
+                handleStart();
+              }
+            }, 1200);
+          };
+
+          const toggleAutoTrain = () => {
+            if (isAutoTraining) {
+              setIsAutoTraining(false);
+              autoTrainingRef.current = false;
+            } else {
+              setIsAutoTraining(true);
+              autoTrainingRef.current = true;
+              if (!isPlaying && !trialComplete) handleStart();
+            }
+          };
+
+          return (
+            <div className="flex flex-col items-center justify-center p-6 bg-slate-50 min-h-screen font-sans">
+              <div className="bg-white p-6 rounded-xl shadow-lg w-full max-w-5xl border border-slate-200">
+                
+                <div className="mb-6">
+                  <h1 className="text-3xl font-bold text-slate-800 mb-2">Error-Driven Plasticity & Time Warping</h1>
+                  <p className="text-slate-600 leading-relaxed">
+                    Temporal memory is structural AMPA receptor density. A dopamine burst (positive error) populates more post-synaptic red slots with AMPA receptors. With a higher density of these excitatory receptors available, each neuron triggers its downstream neighbor faster, actively accelerating the "stadium wave" across the cortical array.
+                  </p>
+                </div>
+
+                <div className="flex gap-4 mb-4">
+                  <div className="bg-slate-100 p-3 rounded-lg border border-slate-200 flex-1 flex items-center justify-between">
+                    <span className="font-semibold text-slate-700">Target Interval:</span>
+                    <div className="flex items-center gap-2">
+                      <input 
+                        type="number" 
+                        value={targetTime}
+                        onChange={(e) => setTargetTime(Number(e.target.value))}
+                        disabled={activeTab === 'shaping' || isAutoTraining}
+                        className="w-24 px-2 py-1 border rounded text-right font-mono text-blue-600 font-bold disabled:bg-slate-200 disabled:text-slate-400"
+                        step="100"
+                      />
+                      <span className="text-slate-500 text-sm">ms</span>
+                    </div>
+                  </div>
+                  
+                  <div className="bg-slate-100 p-3 rounded-lg border border-slate-200 flex-1 flex items-center justify-between">
+                    <span className="font-semibold text-slate-700">AMPA Receptor Density:</span>
+                    <span className="font-mono text-emerald-600 font-bold text-lg">{(networkWeight * 100).toFixed(0)}%</span>
+                  </div>
+                </div>
+
+                <div className="relative w-full h-[380px] bg-white border-2 border-slate-300 rounded-lg overflow-hidden mb-6 shadow-sm">
+                  <canvas ref={canvasRef} width={canvasWidth} height={canvasHeight} className="w-full h-full block" />
+                  
+                  <div className="absolute bottom-4 left-4 bg-white/90 p-3 rounded shadow-sm border border-slate-300 text-sm">
+                    <div className="font-semibold text-slate-700">Current Run: <span className="text-emerald-600 font-mono text-lg">{(time / 1000).toFixed(2)}s</span></div>
+                    <div className="text-slate-500 mt-1">Expected based on AMPA: <span className="font-mono text-slate-700">{(expectedTime / 1000).toFixed(2)}s</span></div>
+                  </div>
+                  
+                  {isAutoTraining && (
+                    <div className="absolute top-4 right-4 bg-indigo-600/90 text-white px-4 py-2 rounded-full shadow font-bold text-sm animate-pulse">
+                      Auto-Training Active...
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex border-b border-slate-200 mb-6">
+                  <button 
+                    onClick={() => { setActiveTab('error'); setIsAutoTraining(false); autoTrainingRef.current = false; }} 
+                    className={`px-6 py-3 font-bold text-lg ${activeTab === 'error' ? 'text-blue-600 border-b-4 border-blue-600' : 'text-slate-500 hover:text-slate-700'}`}
+                  >
+                    Error-Driven Learning
+                  </button>
+                  <button 
+                    onClick={() => { setActiveTab('shaping'); setIsAutoTraining(false); autoTrainingRef.current = false; }} 
+                    className={`px-6 py-3 font-bold text-lg ${activeTab === 'shaping' ? 'text-emerald-600 border-b-4 border-emerald-600' : 'text-slate-500 hover:text-slate-700'}`}
+                  >
+                    Operant Shaping
+                  </button>
+                </div>
+
+                {activeTab === 'error' && (
+                  <div className={`p-6 rounded-lg border transition-colors ${trialComplete ? 'bg-indigo-50 border-indigo-200' : 'bg-slate-50 border-slate-200'}`}>
+                    {!trialComplete ? (
+                      <div className="flex justify-between items-center">
+                        <div>
+                          <h3 className="font-bold text-slate-800 text-lg">Network Waiting</h3>
+                          <p className="text-sm text-slate-600">Run a single trial or let the network automatically minimize temporal error. <br/><span className="italic text-slate-500">(Tip: Set Target Interval &gt; 2500ms to test the Dopamine Dip cascade).</span></p>
+                        </div>
+                        <div className="flex gap-4">
+                          <button 
+                            onClick={handleStart} 
+                            disabled={isPlaying || isAutoTraining}
+                            className="px-6 py-3 bg-slate-600 hover:bg-slate-700 disabled:bg-slate-300 text-white font-bold rounded-lg shadow-md transition-colors"
+                          >
+                            Run Single Trial
+                          </button>
+                          <button 
+                            onClick={toggleAutoTrain}
+                            disabled={isPlaying && !isAutoTraining}
+                            className={`px-6 py-3 font-bold text-white rounded-lg shadow-md transition-colors
+                              ${isAutoTraining ? 'bg-red-500 hover:bg-red-600' : 'bg-indigo-600 hover:bg-indigo-700'}`}
+                          >
+                            {isAutoTraining ? 'Stop Auto-Train' : 'Auto-Train to Target'}
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col md:flex-row justify-between items-center gap-6">
+                        <div className="w-full md:w-1/3">
+                          <h3 className="font-bold text-indigo-900 text-lg">Evaluate Error</h3>
+                          <div className="text-sm mt-1">
+                            Action triggered at: <span className="font-mono font-bold text-slate-800">{Math.round(actualTime)}ms</span> (Target: {targetTime}ms)
+                            <br />
+                            Error: <span className={`font-mono font-bold ${actualTime > targetTime ? 'text-emerald-600' : 'text-red-600'}`}>
+                              {actualTime > targetTime ? '+' : ''}{Math.round(actualTime - targetTime)}ms
+                            </span>
+                            <br />
+                            <span className="font-semibold text-slate-600 mt-2 block">
+                              {actualTime > targetTime ? 'Network was too slow.' : 'Network was too fast.'}
+                            </span>
+                          </div>
+                        </div>
+                        
+                        <div className="flex gap-4 w-full md:w-2/3 mt-4 md:mt-0">
+                          <div className="flex-1 relative">
+                            {actualTime > targetTime && (
+                              <div className="absolute -top-4 inset-x-0 flex justify-center z-20 pointer-events-none">
+                                <span className="bg-emerald-800 text-white text-[10px] uppercase tracking-wider px-3 py-1 rounded-full shadow border border-emerald-400">Corrective Action</span>
+                              </div>
+                            )}
+                            <button 
+                              onClick={() => applyDopamineFeedback('burst', actualTime - targetTime)}
+                              disabled={isApplyingFeedback}
+                              className={`w-full h-full px-4 py-3 text-white font-bold rounded-lg shadow-md transition-all
+                                ${actualTime > targetTime ? 'bg-emerald-500 hover:bg-emerald-600 ring-4 ring-emerald-300 scale-105 relative z-10' : 'bg-slate-400 hover:bg-slate-500 opacity-90'}`}
+                            >
+                              Deliver Burst <br/><span className="text-xs font-normal">Increase AMPA (Speed Up)</span>
+                            </button>
+                          </div>
+                          
+                          <div className="flex-1 relative">
+                            {actualTime < targetTime && (
+                              <div className="absolute -top-4 inset-x-0 flex justify-center z-20 pointer-events-none">
+                                <span className="bg-red-900 text-white text-[10px] uppercase tracking-wider px-3 py-1 rounded-full shadow border border-red-400">Corrective Action</span>
+                              </div>
+                            )}
+                            <button 
+                              onClick={() => applyDopamineFeedback('dip', actualTime - targetTime)}
+                              disabled={isApplyingFeedback}
+                              className={`w-full h-full px-4 py-3 text-white font-bold rounded-lg shadow-md transition-all
+                                ${actualTime < targetTime ? 'bg-red-500 hover:bg-red-600 ring-4 ring-red-300 scale-105 relative z-10' : 'bg-slate-400 hover:bg-slate-500 opacity-90'}`}
+                            >
+                              Simulate Dip <br/><span className="text-xs font-normal">Decrease AMPA (Slow Down)</span>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {activeTab === 'shaping' && (
+                  <div className="p-6 rounded-lg border bg-emerald-50 border-emerald-200">
+                    <div className="flex justify-between items-center mb-4">
+                      <div>
+                        <h3 className="font-bold text-emerald-900 text-lg">Direct Environmental Control</h3>
+                        <p className="text-sm text-emerald-700">Apply neuromodulators manually to shape the interval, bypassing calculated error.</p>
+                      </div>
+                      <button 
+                        onClick={handleStart} 
+                        disabled={isPlaying}
+                        className="px-8 py-4 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-300 text-white font-bold rounded-lg shadow-md transition-colors"
+                      >
+                        {isPlaying ? 'Running Cascade...' : 'Trigger Stimulus (Test)'}
+                      </button>
+                    </div>
+                    
+                    <div className="flex gap-4">
+                      <button 
+                        onClick={() => applyDopamineFeedback('burst')}
+                        className="flex-1 px-6 py-4 bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-lg shadow transition-colors"
+                      >
+                        Force Dopamine Burst <br/><span className="text-sm font-normal">Increase AMPA (Speed Up)</span>
+                      </button>
+                      <button 
+                        onClick={() => applyDopamineFeedback('dip')}
+                        className="flex-1 px-6 py-4 bg-red-500 hover:bg-red-600 text-white font-bold rounded-lg shadow transition-colors"
+                      >
+                        Force Dopamine Dip <br/><span className="text-sm font-normal">Decrease AMPA (Slow Down)</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+              </div>
+            </div>
+          );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
