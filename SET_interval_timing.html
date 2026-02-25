@@ -1,0 +1,881 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>SET — Scalar Expectancy Theory</title>
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@500;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg:         #070c07;
+      --panel:      #0c130c;
+      --border:     #1c301c;
+      --green:      #3dff1a;
+      --green-dim:  #1a6010;
+      --green-glow: rgba(61,255,26,0.15);
+      --amber:      #ffb300;
+      --red:        #ff3b3b;
+      --cyan:       #00e5ff;
+      --magenta:    #ff4dff;
+      --text:       #b8ddb8;
+      --dim:        #3a5a3a;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg); color: var(--text);
+      font-family: 'Share Tech Mono', monospace;
+      min-height: 100vh; padding: 22px 18px;
+    }
+    header { text-align: center; margin-bottom: 20px; }
+    header h1 {
+      font-family: 'Orbitron', sans-serif; font-weight: 700;
+      font-size: 1.35rem; color: var(--green);
+      letter-spacing: 0.14em; text-shadow: 0 0 20px #1a6010;
+    }
+    header p { font-size: 0.7rem; color: var(--dim); margin-top: 5px; letter-spacing: 0.07em; }
+    .wrapper { max-width: 980px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; }
+
+    /* ── DIAGRAM ─────────────────────────────────────────────── */
+    .diagram-wrap {
+      background: var(--panel); border: 1px solid var(--border);
+      padding: 14px 18px 12px;
+    }
+    .diag-title {
+      font-family: 'Orbitron', sans-serif; font-size: 0.52rem;
+      letter-spacing: 0.14em; color: var(--dim); text-transform: uppercase;
+      border-bottom: 1px solid var(--border); padding-bottom: 6px; margin-bottom: 12px;
+    }
+    .diag-row {
+      display: flex; align-items: center; justify-content: center;
+      gap: 0; flex-wrap: wrap;
+    }
+
+    .dbox {
+      background: var(--bg); border: 1px solid var(--border);
+      padding: 7px 13px; text-align: center; min-width: 90px;
+      transition: border-color .15s, box-shadow .15s; position: relative;
+    }
+    .dbox-lbl {
+      font-family: 'Orbitron', sans-serif; font-size: 0.48rem;
+      letter-spacing: 0.1em; color: var(--dim); text-transform: uppercase; margin-bottom: 3px;
+    }
+    .dbox-val { font-size: 0.85rem; color: var(--green); letter-spacing: 0.04em; min-height: 1.1em; }
+    .dbox.wm  .dbox-val { color: var(--cyan); }
+    .dbox.ref .dbox-val { color: var(--magenta); }
+    .dbox.resp .dbox-val { color: var(--amber); }
+
+    .dbox.lit       { border-color: var(--green);   box-shadow: 0 0 10px var(--green-glow); }
+    .dbox.lit       .dbox-val { text-shadow: 0 0 7px var(--green); }
+    .dbox.wm.lit    { border-color: var(--cyan);    box-shadow: 0 0 10px rgba(0,229,255,0.2); }
+    .dbox.wm.lit    .dbox-val { text-shadow: 0 0 7px var(--cyan); }
+    .dbox.ref.lit   { border-color: var(--magenta); box-shadow: 0 0 10px rgba(255,77,255,0.2); }
+    .dbox.ref.lit   .dbox-val { text-shadow: 0 0 7px var(--magenta); }
+    .dbox.match-lit { border-color: var(--amber);   box-shadow: 0 0 16px rgba(255,179,0,0.45); }
+    .dbox.match-lit .dbox-val { color: var(--amber); text-shadow: 0 0 10px var(--amber); }
+    .dbox.resp-flash { border-color: var(--amber);  box-shadow: 0 0 20px rgba(255,179,0,0.55); }
+    .dbox.resp-flash .dbox-val { color: var(--amber); text-shadow: 0 0 12px var(--amber); }
+
+    /* noise badge */
+    .noise-tag {
+      position: absolute; top: -8px; right: -5px;
+      background: #1a1a00; border: 1px solid #444400;
+      font-size: 0.46rem; color: #aaaa44; padding: 1px 4px;
+      letter-spacing: 0.04em; white-space: nowrap; pointer-events: none;
+    }
+
+    .conn {
+      color: var(--dim); font-size: 0.8rem; padding: 0 3px;
+      display: flex; align-items: center; user-select: none; white-space: nowrap;
+    }
+
+    /* similarity meter */
+    .sim-wrap {
+      display: flex; flex-direction: column; align-items: center;
+      gap: 3px; padding: 0 8px;
+    }
+    .sim-lbl  { font-size: 0.5rem; color: var(--dim); letter-spacing: 0.05em; text-align: center; }
+    .sim-outer {
+      width: 14px; height: 74px; background: #080f08;
+      border: 1px solid var(--border); position: relative; overflow: hidden;
+    }
+    .sim-threshold-line {
+      position: absolute; left: 0; right: 0; height: 1px;
+      background: var(--amber); opacity: 0.6;
+    }
+    .sim-fill {
+      position: absolute; bottom: 0; left: 0; right: 0; background: var(--green);
+      transition: height 0.05s, background 0.1s;
+      box-shadow: 0 0 5px var(--green);
+    }
+    .sim-val { font-size: 0.62rem; color: var(--green); }
+
+    /* memory column */
+    .mem-col   { display: flex; flex-direction: column; gap: 5px; align-items: center; }
+    .mem-arrow { font-size: 0.65rem; color: var(--dim); text-align: center; }
+
+    /* ── PANELS ─────────────────────────────────────────────── */
+    .panels-row { display: grid; grid-template-columns: 1fr 298px; gap: 12px; }
+    .canvas-card { background: var(--panel); border: 1px solid var(--border); padding: 10px 12px 8px; }
+    .ch-label {
+      font-size: 0.6rem; color: var(--dim); letter-spacing: 0.08em; text-transform: uppercase;
+      margin-bottom: 6px; display: flex; justify-content: space-between; align-items: baseline;
+    }
+    .ch-label span { color: var(--amber); }
+    canvas { display: block; background: #030603; }
+    .side-col { display: flex; flex-direction: column; gap: 12px; }
+
+    /* ── CONTROLS ───────────────────────────────────────────── */
+    .controls-row { display: flex; gap: 12px; flex-wrap: wrap; }
+    .ctrl-card { background: var(--panel); border: 1px solid var(--border); padding: 13px 17px; flex: 1; min-width: 190px; }
+    .ctrl-title {
+      font-family: 'Orbitron', sans-serif; font-size: 0.52rem; letter-spacing: 0.15em;
+      color: var(--dim); text-transform: uppercase;
+      border-bottom: 1px solid var(--border); padding-bottom: 5px; margin-bottom: 11px;
+    }
+    .ctrl-row { display: flex; align-items: center; gap: 8px; margin-bottom: 9px; font-size: 0.7rem; }
+    .ctrl-row > .cl { color: var(--dim); flex: 0 0 150px; }
+    .ctrl-row .readout { color: var(--green); min-width: 56px; text-align: right; font-size: 0.76rem; }
+    .nc { color: #aaaa44; }
+    input[type=range] { flex: 1; accent-color: var(--green); cursor: pointer; }
+    .btn-row { display: flex; gap: 9px; margin-bottom: 12px; }
+    button {
+      font-family: 'Share Tech Mono', monospace; font-size: 0.76rem; letter-spacing: 0.07em;
+      padding: 7px 20px; background: transparent; cursor: pointer; border: 1px solid;
+      transition: background .12s, color .12s;
+    }
+    #btnStart { border-color: var(--green); color: var(--green); }
+    #btnStart:not(:disabled):hover { background: var(--green); color: var(--bg); }
+    #btnReset { border-color: var(--dim); color: var(--dim); }
+    #btnReset:hover { border-color: var(--amber); color: var(--amber); }
+    button:disabled { opacity: .3; cursor: not-allowed; }
+    .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+    .stat { background: var(--bg); border: 1px solid var(--border); padding: 6px 9px; }
+    .stat .s-lbl { font-size: 0.56rem; color: var(--dim); letter-spacing: 0.05em; text-transform: uppercase; }
+    .stat .s-val { font-size: 0.82rem; color: var(--green); margin-top: 2px; }
+
+    .model-note {
+      background: var(--panel); border: 1px solid var(--border);
+      border-left: 3px solid var(--green-dim);
+      padding: 10px 14px; font-size: 0.67rem; color: var(--dim); line-height: 1.8;
+    }
+    .model-note strong { color: var(--text); }
+    .cc { color: var(--cyan); } .mc { color: var(--magenta); } .ac { color: var(--amber); }
+  </style>
+</head>
+<body>
+<div class="wrapper">
+
+  <header>
+    <h1>SCALAR EXPECTANCY THEORY (SET)</h1>
+    <p>Gibbon, Church &amp; Meck (1984) &nbsp;·&nbsp; Pacemaker – Switch – Accumulator – Memory – Comparator – Response</p>
+  </header>
+
+  <!-- DIAGRAM -->
+  <div class="diagram-wrap">
+    <div class="diag-title">Information-Processing Architecture</div>
+    <div class="diag-row">
+
+      <div class="dbox" id="dPacemaker">
+        <div class="dbox-lbl">Pacemaker (λ)</div>
+        <div class="dbox-val" id="dPacVal">— Hz</div>
+        <div class="noise-tag">σ<sub>λ</sub></div>
+      </div>
+      <div class="conn">──▶</div>
+
+      <div class="dbox" id="dSwitch">
+        <div class="dbox-lbl">Switch</div>
+        <div class="dbox-val" id="dSwVal">READY</div>
+        <div class="noise-tag">σ<sub>sw</sub></div>
+      </div>
+      <div class="conn">──▶</div>
+
+      <div class="dbox" id="dAccum">
+        <div class="dbox-lbl">Accumulator (n)</div>
+        <div class="dbox-val" id="dAccVal">0</div>
+      </div>
+      <div class="conn">──▶</div>
+
+      <!-- Comparator with similarity meter -->
+      <div style="display:flex;align-items:center;gap:0">
+        <div class="dbox" id="dComp" style="min-width:110px">
+          <div class="dbox-lbl">Comparator</div>
+          <div class="dbox-val" id="dCompSim">sim: —</div>
+          <div style="font-size:0.62rem;color:var(--dim);margin-top:2px" id="dCompStatus">|n − K*| / K*</div>
+        </div>
+        <div class="sim-wrap">
+          <div class="sim-lbl">sim</div>
+          <div class="sim-outer">
+            <div class="sim-threshold-line" id="simThreshLine"></div>
+            <div class="sim-fill" id="simFill" style="height:0%"></div>
+          </div>
+          <div class="sim-val" id="simVal">0.00</div>
+        </div>
+      </div>
+
+      <div class="conn">──▶</div>
+      <div class="dbox resp" id="dResp">
+        <div class="dbox-lbl">Response</div>
+        <div class="dbox-val" id="dRespVal">—</div>
+      </div>
+
+      <!-- memory column bridge -->
+      <div class="conn" style="padding:0 10px">
+        <div style="font-size:0.55rem;color:var(--dim);line-height:1.4;text-align:center">
+          ↕<br>mem
+        </div>
+      </div>
+
+      <div class="mem-col">
+        <div class="dbox wm" id="dWm">
+          <div class="dbox-lbl">Working Memory (n*)</div>
+          <div class="dbox-val" id="dWmVal">—</div>
+          <div class="noise-tag">σ<sub>wm</sub></div>
+        </div>
+        <div class="mem-arrow">encode at T ↑ · retrieve ↓</div>
+        <div class="dbox ref" id="dRef">
+          <div class="dbox-lbl">Reference Memory (K*)</div>
+          <div class="dbox-val" id="dRefVal">—</div>
+          <div class="noise-tag">σ<sub>rm</sub></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- CANVASES -->
+  <div class="panels-row">
+    <div class="canvas-card">
+      <div class="ch-label">
+        CH1 — Accumulator · Similarity Score · Response Window
+        <span id="trialLbl"></span>
+      </div>
+      <canvas id="traceCanvas" width="600" height="230"></canvas>
+    </div>
+    <div class="side-col">
+      <div class="canvas-card">
+        <div class="ch-label">CH2 — Pacemaker Pulse Train</div>
+        <canvas id="pmCanvas" width="276" height="88"></canvas>
+      </div>
+      <div class="canvas-card">
+        <div class="ch-label">CH3 — Response Time Histogram</div>
+        <canvas id="histCanvas" width="276" height="112"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- CONTROLS -->
+  <div class="controls-row">
+    <div class="ctrl-card">
+      <div class="ctrl-title">Clock Stage</div>
+      <div class="ctrl-row">
+        <span class="cl">Pacemaker Rate (λ)</span>
+        <input type="range" id="rateSlider" min="1" max="30" step="0.5" value="10">
+        <span class="readout"><span id="rateOut">10.0</span> Hz</span>
+      </div>
+      <div class="ctrl-row">
+        <span class="cl">Target Interval (T)</span>
+        <input type="range" id="intSlider" min="1" max="10" step="0.5" value="4">
+        <span class="readout"><span id="intOut">4.0</span> s</span>
+      </div>
+      <div class="ctrl-row">
+        <span class="cl nc">Switch Latency Noise (σ<sub>sw</sub>)</span>
+        <input type="range" id="swNoiseSlider" min="0" max="0.5" step="0.01" value="0.05">
+        <span class="readout nc"><span id="swNoiseOut">0.05</span> s</span>
+      </div>
+    </div>
+
+    <div class="ctrl-card">
+      <div class="ctrl-title">Memory Stage</div>
+      <div class="ctrl-row">
+        <span class="cl nc">Working Mem Noise (σ<sub>wm</sub>)</span>
+        <input type="range" id="wmNoiseSlider" min="0" max="0.3" step="0.01" value="0.05">
+        <span class="readout nc"><span id="wmNoiseOut">0.05</span></span>
+      </div>
+      <div class="ctrl-row">
+        <span class="cl nc">Reference Mem Noise (σ<sub>rm</sub>)</span>
+        <input type="range" id="rmNoiseSlider" min="0" max="0.3" step="0.01" value="0.05">
+        <span class="readout nc"><span id="rmNoiseOut">0.05</span></span>
+      </div>
+      <div class="ctrl-row">
+        <span class="cl">Response Threshold (b)</span>
+        <input type="range" id="threshSlider" min="0.05" max="0.5" step="0.01" value="0.20">
+        <span class="readout"><span id="threshOut">0.20</span></span>
+      </div>
+    </div>
+
+    <div class="ctrl-card">
+      <div class="ctrl-title">Control &amp; Statistics</div>
+      <div class="ctrl-row">
+        <span class="cl">Auto-repeat Trials</span>
+        <input type="range" id="repeatSlider" min="1" max="40" step="1" value="1">
+        <span class="readout"><span id="repeatOut">1</span></span>
+      </div>
+      <div class="btn-row" style="margin-top:4px">
+        <button id="btnStart">▶ START</button>
+        <button id="btnReset">↺ RESET</button>
+      </div>
+      <div class="stat-grid">
+        <div class="stat"><div class="s-lbl">Trial</div><div class="s-val" id="sTrial">—</div></div>
+        <div class="stat"><div class="s-lbl">K* (this trial)</div><div class="s-val" id="sK">—</div></div>
+        <div class="stat"><div class="s-lbl">Response Time</div><div class="s-val" id="sRT">—</div></div>
+        <div class="stat"><div class="s-lbl">Mean RT</div><div class="s-val" id="sMean">—</div></div>
+        <div class="stat"><div class="s-lbl">SD</div><div class="s-val" id="sSD">—</div></div>
+        <div class="stat"><div class="s-lbl">CV (σ/μ)</div><div class="s-val" id="sCV">—</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="model-note">
+    <strong>Memory pipeline &amp; comparator logic:</strong>
+    At reinforcement time T, the accumulator value n(T) is encoded into
+    <span class="cc">working memory</span> with multiplicative noise σ<sub>wm</sub> → n*.
+    On each new trial, <span class="mc">reference memory K*</span> is sampled from n*
+    with retrieval noise σ<sub>rm</sub>. Crucially, <strong>n* is stored at T</strong>, not at
+    response time — so K* does not drift across trials. The
+    <span class="ac">comparator</span> continuously computes a <strong>similarity score</strong>
+    = 1 − |n − K*| / K*, rising from 0 toward 1.0 as the accumulator approaches K*.
+    When similarity ≥ 1 − b (threshold b), the comparator declares
+    <strong>MATCH</strong> and triggers a response. The amber band on CH1 shows the
+    response window K* ± b·K*. Set η noise parameters &gt; 0 and run 30+ trials to
+    observe the scalar property: CV stays roughly constant across different values of T.
+  </div>
+
+</div>
+
+<script>
+// ─── Parameters ──────────────────────────────────────────────────────────────
+const P = {
+  rate:      10,    // pacemaker Hz
+  target:    4000,  // ms
+  swNoise:   0.05,  // switch latency SD (seconds)
+  wmNoise:   0.05,  // working memory encoding noise (multiplicative σ)
+  rmNoise:   0.05,  // reference memory retrieval noise (multiplicative σ)
+  threshold: 0.20,  // ratio threshold b: respond when |n-K*|/K* ≤ b
+  repeat:    1,
+};
+
+// ─── State ────────────────────────────────────────────────────────────────────
+const S = {
+  phase:         'idle', // idle | timing | pausing | done
+  trialNum:      0,
+  totalTrials:   0,
+  tickCount:     0,
+  Kstar:         0,    // reference memory value (ticks), drawn fresh each trial
+  nStar:         0,    // working memory value (ticks), updated at T each trial
+  trialStart:    0,
+  lastTickTime:  0,
+  switchLatency: 0,    // ms jitter on switch close time
+  switchClosed:  false,
+  responseTimes: [],
+  trialData:     [],   // {elapsed, count, sim, inWindow} per frame
+  traceHistory:  [],
+  afterTimer:    null,
+};
+
+// ─── Canvas contexts ──────────────────────────────────────────────────────────
+const traceC = document.getElementById('traceCanvas'); const tc = traceC.getContext('2d');
+const pmC    = document.getElementById('pmCanvas');    const pc = pmC.getContext('2d');
+const histC  = document.getElementById('histCanvas');  const hc = histC.getContext('2d');
+
+// ─── DOM helpers ─────────────────────────────────────────────────────────────
+const $ = id => document.getElementById(id);
+const D = {
+  dPacemaker: $('dPacemaker'), dSwitch: $('dSwitch'), dAccum: $('dAccum'),
+  dComp: $('dComp'), dResp: $('dResp'), dWm: $('dWm'), dRef: $('dRef'),
+  dPacVal: $('dPacVal'), dSwVal: $('dSwVal'), dAccVal: $('dAccVal'),
+  dCompSim: $('dCompSim'), dCompStatus: $('dCompStatus'),
+  dRespVal: $('dRespVal'), dWmVal: $('dWmVal'), dRefVal: $('dRefVal'),
+  simFill: $('simFill'), simThreshLine: $('simThreshLine'), simVal: $('simVal'),
+  trialLbl: $('trialLbl'),
+  sTrial: $('sTrial'), sK: $('sK'), sRT: $('sRT'),
+  sMean: $('sMean'), sSD: $('sSD'), sCV: $('sCV'),
+  btnStart: $('btnStart'), btnReset: $('btnReset'),
+  rateOut: $('rateOut'), intOut: $('intOut'),
+  swNoiseOut: $('swNoiseOut'), wmNoiseOut: $('wmNoiseOut'),
+  rmNoiseOut: $('rmNoiseOut'), threshOut: $('threshOut'), repeatOut: $('repeatOut'),
+};
+
+// ─── Sliders ──────────────────────────────────────────────────────────────────
+[
+  ['rateSlider',    v => { P.rate      = +v; D.rateOut.textContent    = (+v).toFixed(1); }],
+  ['intSlider',     v => { P.target    = +v*1000; D.intOut.textContent= (+v).toFixed(1); }],
+  ['swNoiseSlider', v => { P.swNoise   = +v; D.swNoiseOut.textContent = (+v).toFixed(2); }],
+  ['wmNoiseSlider', v => { P.wmNoise   = +v; D.wmNoiseOut.textContent = (+v).toFixed(2); }],
+  ['rmNoiseSlider', v => { P.rmNoise   = +v; D.rmNoiseOut.textContent = (+v).toFixed(2); }],
+  ['threshSlider',  v => { P.threshold = +v; D.threshOut.textContent  = (+v).toFixed(2); updateSimMeterThresh(); }],
+  ['repeatSlider',  v => { P.repeat    = +v; D.repeatOut.textContent  = v; }],
+].forEach(([id, fn]) => $(id).addEventListener('input', e => fn(e.target.value)));
+
+D.btnStart.addEventListener('click', startSession);
+D.btnReset.addEventListener('click', fullReset);
+
+// ─── Utilities ────────────────────────────────────────────────────────────────
+function randNorm() {
+  let u, v;
+  do { u = Math.random(); } while (!u);
+  do { v = Math.random(); } while (!v);
+  return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+}
+
+// Multiplicative noise: value * exp(σ * z), z ~ N(0,1)
+function multNoise(val, sigma) {
+  return sigma > 0 ? val * Math.exp(sigma * randNorm()) : val;
+}
+
+function lit(el, on, extra) {
+  el.classList.toggle(extra || 'lit', !!on);
+}
+
+function updateSimMeterThresh() {
+  // similarity threshold = 1 - b; as % of bar height
+  const thresh = 1 - P.threshold;
+  D.simThreshLine.style.bottom = (thresh * 100) + '%';
+}
+
+function diagReset() {
+  D.dPacVal.textContent   = P.rate.toFixed(1) + ' Hz';
+  D.dSwVal.textContent    = 'READY';
+  D.dAccVal.textContent   = '0';
+  D.dCompSim.textContent  = 'sim: —';
+  D.dCompStatus.textContent = '|n − K*| / K*';
+  D.dRespVal.textContent  = '—';
+  D.dWmVal.textContent    = S.nStar > 0 ? S.nStar + ' ticks' : '—';
+  D.dRefVal.textContent   = S.Kstar > 0 ? S.Kstar + ' ticks' : '—';
+  D.simFill.style.height  = '0%';
+  D.simFill.style.background    = 'var(--green)';
+  D.simFill.style.boxShadow     = '0 0 5px var(--green)';
+  D.simVal.textContent    = '0.00';
+  D.simVal.style.color    = 'var(--green)';
+  [D.dPacemaker, D.dSwitch, D.dAccum, D.dComp, D.dResp, D.dWm, D.dRef]
+    .forEach(el => el.classList.remove('lit', 'match-lit', 'resp-flash'));
+  if (S.Kstar > 0) lit(D.dRef, true);
+  if (S.nStar > 0) lit(D.dWm, true);
+}
+
+// ─── Session flow ─────────────────────────────────────────────────────────────
+function startSession() {
+  S.totalTrials   = P.repeat;
+  S.trialNum      = 0;
+  S.responseTimes = [];
+  S.traceHistory  = [];
+  // Reset working/reference memory for fresh session
+  S.nStar = 0;
+  S.Kstar = 0;
+  D.btnStart.disabled = true;
+  beginTrial();
+}
+
+function beginTrial() {
+  if (S.trialNum >= S.totalTrials) {
+    S.phase = 'done';
+    D.btnStart.disabled   = false;
+    D.trialLbl.textContent = 'DONE — ' + S.totalTrials + ' trial(s)';
+    return;
+  }
+  S.trialNum++;
+  S.tickCount    = 0;
+  S.trialData    = [];
+  S.switchClosed = false;
+
+  // ── SWITCH LATENCY: jitter around 0 (early or late close) ──
+  S.switchLatency = P.swNoise > 0 ? P.swNoise * randNorm() * 1000 : 0;
+
+  // ── REFERENCE MEMORY K* ──
+  // Working memory n* was stored at the END of the PREVIOUS trial (at time T).
+  // If no previous trial, bootstrap from ideal tick count.
+  // K* is retrieved from n* with multiplicative retrieval noise EACH trial.
+  const idealTicks = (P.target / 1000) * P.rate;
+  const base = S.nStar > 0 ? S.nStar : idealTicks;
+  S.Kstar = Math.max(1, Math.round(multNoise(base, P.rmNoise)));
+
+  S.trialStart   = performance.now();
+  S.lastTickTime = S.trialStart;
+  S.phase        = 'timing';
+
+  // diagram
+  D.dSwVal.textContent  = 'OPEN';
+  D.dRefVal.textContent = S.Kstar + ' ticks';
+  D.dPacVal.textContent = P.rate.toFixed(1) + ' Hz';
+  lit(D.dPacemaker, true);
+  lit(D.dRef, true);
+
+  D.sTrial.textContent   = S.trialNum + ' / ' + S.totalTrials;
+  D.sK.textContent       = S.Kstar;
+  D.trialLbl.textContent = 'TRIAL ' + S.trialNum + ' / ' + S.totalTrials;
+
+  updateSimMeterThresh();
+}
+
+function handleResponse(elapsed) {
+  S.phase = 'pausing';
+  const rt = elapsed / 1000;
+  S.responseTimes.push(rt);
+  S.traceHistory.push([...S.trialData]);
+
+  // ── STORE IN WORKING MEMORY ──
+  // In SET, working memory is updated at REINFORCEMENT TIME T,
+  // not at the response. The animal responds ~at T (within the window),
+  // and reinforcement arrives at T. We store the ideal accumulator value
+  // at T (with wm encoding noise) as n*.
+  // This is what prevents K* from drifting toward the window edge each trial.
+  const nAtT = (P.target / 1000) * P.rate; // ideal ticks at T
+  S.nStar = Math.max(1, Math.round(multNoise(nAtT, P.wmNoise)));
+
+  // diagram
+  D.dCompSim.textContent    = 'MATCH ✓';
+  D.dCompStatus.textContent = '→ RESPONSE';
+  D.dRespVal.textContent    = rt.toFixed(3) + ' s';
+  D.dWmVal.textContent      = S.nStar + ' ticks';
+  lit(D.dWm, true);
+  D.dResp.classList.add('resp-flash');
+  D.dComp.classList.add('match-lit');
+  lit(D.dComp, false);
+
+  D.sRT.textContent = rt.toFixed(3) + ' s';
+  updateStats();
+  drawHist();
+
+  S.afterTimer = setTimeout(() => {
+    S.afterTimer = null;
+    diagReset();
+    beginTrial();
+  }, 750);
+}
+
+function updateStats() {
+  const rts = S.responseTimes;
+  if (!rts.length) return;
+  const n    = rts.length;
+  const mean = rts.reduce((a, b) => a + b, 0) / n;
+  const sd   = n > 1 ? Math.sqrt(rts.reduce((a, b) => a + (b - mean) ** 2, 0) / (n - 1)) : 0;
+  D.sMean.textContent = mean.toFixed(3) + ' s';
+  D.sSD.textContent   = sd.toFixed(3) + ' s';
+  D.sCV.textContent   = sd > 0 ? (sd / mean).toFixed(3) : '—';
+}
+
+function fullReset() {
+  S.phase = 'idle';
+  if (S.afterTimer) { clearTimeout(S.afterTimer); S.afterTimer = null; }
+  Object.assign(S, {
+    trialNum: 0, totalTrials: 0, tickCount: 0, Kstar: 0, nStar: 0,
+    responseTimes: [], traceHistory: [], trialData: [],
+    switchClosed: false,
+  });
+  D.btnStart.disabled = false;
+  ['sTrial','sK','sRT','sMean','sSD','sCV'].forEach(k => D[k].textContent = '—');
+  D.trialLbl.textContent = '';
+  diagReset();
+  drawHist();
+}
+
+// ─── Main animation loop ──────────────────────────────────────────────────────
+function mainLoop(now) {
+  requestAnimationFrame(mainLoop);
+
+  drawPM(now);
+
+  if (S.phase !== 'timing') return;
+
+  const elapsed = now - S.trialStart;
+  const period  = 1000 / P.rate;
+
+  // ── SWITCH LOGIC ──
+  // switchLatency can be positive (late) or negative (early).
+  // Switch closes at elapsed >= switchLatency.
+  const switchShouldClose = elapsed >= S.switchLatency;
+  if (switchShouldClose && !S.switchClosed) {
+    S.switchClosed = true;
+    D.dSwVal.textContent = 'CLOSED';
+    lit(D.dSwitch, true);
+  }
+
+  if (S.switchClosed) {
+    // Accumulate ticks. lastTickTime tracks wall-clock ms.
+    while (now - S.lastTickTime >= period) {
+      S.lastTickTime += period;
+      S.tickCount++;
+    }
+  } else {
+    // Advance lastTickTime so we don't double-count when switch closes
+    while (now - S.lastTickTime >= period) S.lastTickTime += period;
+  }
+
+  // ── COMPARATOR: similarity score ──
+  // sim = 1 - |n - K*| / K*   (clipped to 0..1)
+  // Rises toward 1.0 as n approaches K*; threshold at (1 - b).
+  const ratio    = S.Kstar > 0 ? S.tickCount / S.Kstar : 0;
+  const distance = Math.abs(1 - ratio);           // |n - K*| / K*
+  const sim      = Math.max(0, 1 - distance);     // 0 = far, 1 = perfect match
+  const inWindow = sim >= (1 - P.threshold);      // sim ≥ 1-b → match
+
+  S.trialData.push({ elapsed, count: S.tickCount, sim, inWindow });
+
+  // ── Update diagram ──
+  D.dAccVal.textContent = S.tickCount;
+  lit(D.dAccum, S.switchClosed);
+
+  if (S.switchClosed) {
+    D.dCompSim.textContent    = 'sim: ' + sim.toFixed(3);
+    D.dCompStatus.textContent = inWindow ? '≥ 1−b  →  MATCH' : '< 1−b  →  waiting';
+    lit(D.dComp,  !inWindow && sim > 0.5);
+    if (inWindow) D.dComp.classList.add('match-lit');
+    else          D.dComp.classList.remove('match-lit');
+  }
+
+  // ── Similarity meter ──
+  const simPct = sim * 100;
+  D.simFill.style.height     = simPct + '%';
+  D.simFill.style.background     = inWindow ? 'var(--amber)' : 'var(--green)';
+  D.simFill.style.boxShadow      = inWindow ? '0 0 8px var(--amber)' : '0 0 5px var(--green)';
+  D.simVal.textContent = sim.toFixed(2);
+  D.simVal.style.color = inWindow ? 'var(--amber)' : 'var(--green)';
+
+  // ── Fire response when similarity first enters window and switch is closed ──
+  if (S.switchClosed && inWindow && S.tickCount > 0) {
+    handleResponse(elapsed);
+  }
+
+  drawTrace();
+}
+
+// ─── CH1: Accumulator trace ───────────────────────────────────────────────────
+function drawTrace() {
+  const W = traceC.width, H = traceC.height;
+  tc.fillStyle = '#030603'; tc.fillRect(0, 0, W, H);
+
+  // grid
+  tc.strokeStyle = '#0d1a0d'; tc.lineWidth = 1;
+  for (let i=0;i<=10;i++){tc.beginPath();tc.moveTo(i*W/10,0);tc.lineTo(i*W/10,H);tc.stroke();}
+  for (let j=0;j<=6;j++) {tc.beginPath();tc.moveTo(0,j*H/6);tc.lineTo(W,j*H/6);tc.stroke();}
+
+  const pad = {l:44,r:22,t:14,b:30};
+  const iW = W-pad.l-pad.r, iH = H-pad.t-pad.b;
+
+  // axis range: show up to 1.5×T in time, up to 1.25×K* in count
+  const maxT = P.target * 1.5;
+  const K    = S.Kstar || Math.max(1, Math.round((P.target/1000)*P.rate));
+  const maxC = K * 1.25;
+
+  const txf = ms  => pad.l + (ms/maxT)*iW;
+  const tyf = cnt => pad.t + iH - (cnt/maxC)*iH;
+
+  // axis labels
+  tc.fillStyle='#2a4a2a'; tc.font='10px Share Tech Mono'; tc.textAlign='center';
+  tc.fillText('time (s)', pad.l+iW/2, H-4);
+  tc.save(); tc.translate(11,pad.t+iH/2); tc.rotate(-Math.PI/2);
+  tc.fillText('tick count (n)',0,0); tc.restore();
+  tc.font='9px Share Tech Mono'; tc.textAlign='center';
+  for(let i=0;i<=5;i++){const ms=(maxT/5)*i; tc.fillStyle='#2a4a2a'; tc.fillText((ms/1000).toFixed(1),txf(ms),H-10);}
+  tc.textAlign='right';
+  for(let i=0;i<=5;i++){const c=(maxC/5)*i; tc.fillStyle='#2a4a2a'; tc.fillText(Math.round(c),pad.l-5,tyf(c)+3);}
+
+  // T vertical line (amber)
+  const xT = txf(P.target);
+  tc.strokeStyle='rgba(255,179,0,0.22)'; tc.lineWidth=1; tc.setLineDash([4,4]);
+  tc.beginPath(); tc.moveTo(xT,pad.t); tc.lineTo(xT,pad.t+iH); tc.stroke(); tc.setLineDash([]);
+  tc.fillStyle='rgba(255,179,0,0.5)'; tc.font='9px Share Tech Mono'; tc.textAlign='center';
+  tc.fillText('T='+(P.target/1000).toFixed(1)+'s', xT, pad.t+10);
+
+  // K* + response window band
+  if (S.Kstar > 0) {
+    const b   = P.threshold;
+    const kLo = K*(1-b), kHi = K*(1+b);
+    // amber window band
+    tc.fillStyle='rgba(255,179,0,0.07)';
+    tc.fillRect(pad.l, tyf(kHi), iW, tyf(kLo)-tyf(kHi));
+    // K* center line (magenta)
+    tc.strokeStyle='rgba(255,77,255,0.55)'; tc.lineWidth=1.5; tc.setLineDash([6,4]);
+    tc.beginPath(); tc.moveTo(pad.l,tyf(K)); tc.lineTo(W-pad.r,tyf(K)); tc.stroke(); tc.setLineDash([]);
+    tc.fillStyle='rgba(255,77,255,0.75)'; tc.font='9px Share Tech Mono'; tc.textAlign='left';
+    tc.fillText('K*='+K, W-pad.r-46, tyf(K)-4);
+    // window edges (amber dashed)
+    tc.strokeStyle='rgba(255,179,0,0.4)'; tc.lineWidth=1; tc.setLineDash([3,3]);
+    [kLo, kHi].forEach(c => {
+      if(c>0 && c<maxC){
+        tc.beginPath(); tc.moveTo(pad.l,tyf(c)); tc.lineTo(W-pad.r,tyf(c)); tc.stroke();
+      }
+    });
+    tc.setLineDash([]);
+    // window bracket labels
+    tc.fillStyle='rgba(255,179,0,0.5)'; tc.textAlign='right'; tc.font='8px Share Tech Mono';
+    if(kLo>0) tc.fillText('K*(1−b)', pad.l+60, tyf(kLo)+10);
+    if(kHi<maxC) tc.fillText('K*(1+b)', pad.l+60, tyf(kHi)-3);
+  }
+
+  // switch latency marker
+  if (S.phase==='timing' && S.switchLatency !== 0) {
+    const xSw = txf(Math.max(0, S.switchLatency));
+    tc.strokeStyle='rgba(0,229,255,0.4)'; tc.lineWidth=1; tc.setLineDash([3,3]);
+    tc.beginPath(); tc.moveTo(xSw,pad.t); tc.lineTo(xSw,pad.t+iH); tc.stroke(); tc.setLineDash([]);
+    tc.fillStyle='rgba(0,229,255,0.55)'; tc.font='8px Share Tech Mono'; tc.textAlign='left';
+    tc.fillText('sw', xSw+2, pad.t+18);
+  }
+
+  // history traces (faded green)
+  const nH = S.traceHistory.length;
+  S.traceHistory.forEach((td, idx) => {
+    if(!td.length) return;
+    const alpha = 0.04 + 0.18*((idx+1)/Math.max(nH,1));
+    tc.strokeStyle=`rgba(61,255,26,${alpha})`; tc.lineWidth=1.5;
+    tc.beginPath();
+    td.forEach((pt,i)=>{ i===0?tc.moveTo(txf(pt.elapsed),tyf(pt.count)):tc.lineTo(txf(pt.elapsed),tyf(pt.count)); });
+    tc.stroke();
+  });
+
+  // current trial — color: green normally, amber when in response window
+  const td = S.trialData;
+  if (td.length > 1) {
+    // glow
+    tc.strokeStyle='rgba(61,255,26,0.07)'; tc.lineWidth=9; tc.lineJoin='round';
+    tc.beginPath();
+    td.forEach((pt,i)=>{ i===0?tc.moveTo(txf(pt.elapsed),tyf(pt.count)):tc.lineTo(txf(pt.elapsed),tyf(pt.count)); });
+    tc.stroke();
+
+    // segmented by inWindow state
+    let curColor = null;
+    td.forEach((pt, i) => {
+      const col = pt.inWindow ? 'rgba(255,179,0,0.95)' : 'rgba(61,255,26,0.9)';
+      if(col !== curColor) {
+        if(curColor !== null) tc.stroke();
+        tc.strokeStyle=col; tc.lineWidth=2.2;
+        tc.beginPath(); tc.moveTo(txf(pt.elapsed), tyf(pt.count));
+        curColor = col;
+      } else {
+        tc.lineTo(txf(pt.elapsed), tyf(pt.count));
+      }
+    });
+    if(curColor) tc.stroke();
+
+    // cursor dot
+    const last = td[td.length-1];
+    const col  = last.inWindow ? '#ffb300' : '#3dff1a';
+    tc.fillStyle=col; tc.shadowColor=col; tc.shadowBlur=12;
+    tc.beginPath(); tc.arc(txf(last.elapsed), tyf(last.count), 4.5, 0, Math.PI*2); tc.fill();
+    tc.shadowBlur=0;
+  }
+
+  // ── Similarity score overlay (right axis, secondary) ──
+  // Draw a faint sim trace on the right side
+  if (td.length > 1) {
+    const simPad = {r:8};
+    const simW   = 34;
+    const simX0  = W - pad.r - simW;
+    // background strip
+    tc.fillStyle='rgba(0,0,0,0.4)';
+    tc.fillRect(simX0, pad.t, simW, iH);
+    // threshold line on sim strip
+    const simThreshY = pad.t + iH * P.threshold; // sim = 1-b → top part
+    tc.strokeStyle='rgba(255,179,0,0.55)'; tc.lineWidth=1; tc.setLineDash([3,2]);
+    tc.beginPath(); tc.moveTo(simX0, pad.t+iH*P.threshold); tc.lineTo(simX0+simW, pad.t+iH*P.threshold); tc.stroke();
+    tc.setLineDash([]);
+    tc.fillStyle='rgba(255,179,0,0.4)'; tc.font='7px Share Tech Mono'; tc.textAlign='left';
+    tc.fillText('1−b', simX0+2, pad.t+iH*P.threshold-2);
+    // sim trace
+    tc.strokeStyle='rgba(255,255,150,0.6)'; tc.lineWidth=1.2;
+    tc.beginPath();
+    td.forEach((pt, i) => {
+      // sim goes 0..1; invert for y (1 at top)
+      const sy = pad.t + iH*(1-pt.sim);
+      const sx = simX0 + pt.sim*simW;
+      // instead: plot sim over time (same x axis)
+      const sx2 = txf(pt.elapsed);
+      // Overlay is too complex spatially; just draw in the sim strip as bar
+      if(i===0) tc.moveTo(simX0 + pt.sim*simW, pad.t+iH - (pt.elapsed/maxT)*iH);
+      else       tc.lineTo(simX0 + pt.sim*simW, pad.t+iH - (pt.elapsed/maxT)*iH);
+    });
+    tc.stroke();
+    // label
+    tc.fillStyle='rgba(255,255,150,0.4)'; tc.font='7px Share Tech Mono'; tc.textAlign='center';
+    tc.fillText('sim', simX0+simW/2, pad.t+8);
+  }
+}
+
+// ─── CH2: Pacemaker ──────────────────────────────────────────────────────────
+function drawPM(now) {
+  const W=pmC.width, H=pmC.height;
+  pc.fillStyle='#030603'; pc.fillRect(0,0,W,H);
+  const period=1000/P.rate, win=2000, pxMs=W/win;
+  const phase=(now%period)/period;
+  const midY=H/2, amp=H*0.36;
+  const pw=Math.max(2.5, period*pxMs*0.18);
+  pc.strokeStyle='#3dff1a'; pc.lineWidth=1.5; pc.shadowColor='#3dff1a'; pc.shadowBlur=4;
+  pc.beginPath();
+  let x=-phase*period*pxMs; pc.moveTo(x,midY);
+  while(x<W+pw){
+    pc.lineTo(x,midY); pc.lineTo(x,midY-amp);
+    pc.lineTo(x+pw,midY-amp); pc.lineTo(x+pw,midY);
+    x+=period*pxMs;
+  }
+  pc.lineTo(W,midY); pc.stroke(); pc.shadowBlur=0;
+  pc.fillStyle='#3dff1a88'; pc.font='9px Share Tech Mono'; pc.textAlign='right';
+  pc.fillText(P.rate.toFixed(1)+' Hz · '+period.toFixed(0)+'ms', W-6, 13);
+}
+
+// ─── CH3: Histogram ──────────────────────────────────────────────────────────
+function drawHist() {
+  const W=histC.width, H=histC.height;
+  hc.fillStyle='#030603'; hc.fillRect(0,0,W,H);
+  const rts=S.responseTimes;
+  if(!rts.length){
+    hc.fillStyle='#2a3a2a'; hc.font='9px Share Tech Mono'; hc.textAlign='center';
+    hc.fillText('run trials to populate',W/2,H/2+4); return;
+  }
+  const T=P.target/1000, minT=Math.max(0,T*0.4), maxT=T*1.6;
+  const bins=16, bw=(maxT-minT)/bins;
+  const counts=new Array(bins).fill(0);
+  rts.forEach(rt=>{ const b=Math.floor((rt-minT)/bw); if(b>=0&&b<bins)counts[b]++; });
+  const maxC=Math.max(...counts,1);
+  const pad={l:8,r:8,t:10,b:20}, iW=W-pad.l-pad.r, iH=H-pad.t-pad.b, bpx=iW/bins;
+
+  // fitted normal curve overlay
+  if(rts.length>3){
+    const n=rts.length, mean=rts.reduce((a,b)=>a+b,0)/n;
+    const sd=Math.sqrt(rts.reduce((a,b)=>a+(b-mean)**2,0)/(n-1));
+    if(sd>0){
+      const peak=rts.length*(bw/(sd*Math.sqrt(2*Math.PI)));
+      hc.strokeStyle='rgba(255,77,255,0.55)'; hc.lineWidth=1.2;
+      hc.beginPath();
+      for(let px=0;px<iW;px++){
+        const t=minT+(px/iW)*(maxT-minT);
+        const y=peak*Math.exp(-0.5*((t-mean)/sd)**2);
+        const sx=pad.l+px, sy=pad.t+iH-(y/maxC)*iH;
+        px===0?hc.moveTo(sx,sy):hc.lineTo(sx,sy);
+      }
+      hc.stroke();
+    }
+  }
+
+  counts.forEach((c,i)=>{
+    if(!c)return;
+    const bh=(c/maxC)*iH, x=pad.l+i*bpx, frac=i/(bins-1);
+    hc.fillStyle=`rgba(61,255,26,${0.2+0.7*frac})`;
+    hc.fillRect(x+1,pad.t+iH-bh,bpx-2,bh);
+  });
+
+  // T line (red)
+  const xT=pad.l+((T-minT)/(maxT-minT))*iW;
+  hc.strokeStyle='rgba(255,59,59,0.55)'; hc.lineWidth=1; hc.setLineDash([3,3]);
+  hc.beginPath(); hc.moveTo(xT,pad.t); hc.lineTo(xT,pad.t+iH); hc.stroke(); hc.setLineDash([]);
+
+  // mean line (amber)
+  if(rts.length>1){
+    const mean=rts.reduce((a,b)=>a+b,0)/rts.length;
+    const mx=pad.l+((mean-minT)/(maxT-minT))*iW;
+    hc.strokeStyle='rgba(255,179,0,0.75)'; hc.lineWidth=1.5; hc.setLineDash([5,3]);
+    hc.beginPath(); hc.moveTo(mx,pad.t); hc.lineTo(mx,pad.t+iH); hc.stroke(); hc.setLineDash([]);
+  }
+
+  hc.fillStyle='#2a4a2a'; hc.font='8px Share Tech Mono';
+  hc.textAlign='left';  hc.fillText(minT.toFixed(1)+'s',pad.l,H-4);
+  hc.textAlign='center';hc.fillText(T.toFixed(1)+'s (T)',xT,H-4);
+  hc.textAlign='right'; hc.fillText(maxT.toFixed(1)+'s',W-pad.r,H-4);
+  hc.fillStyle='#3dff1a66'; hc.fillText('n='+rts.length,W-pad.r,10);
+}
+
+// ─── Boot ─────────────────────────────────────────────────────────────────────
+diagReset();
+drawHist();
+updateSimMeterThresh();
+requestAnimationFrame(mainLoop);
+</script>
+</body>
+</html>
