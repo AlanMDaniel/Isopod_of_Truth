@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Molecular Read/Write Memory</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body class="bg-slate-900 min-h-screen">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        const Nucleotide = ({ type, active }) => {
+          const colors = {
+            A: 'bg-emerald-500',
+            C: 'bg-blue-500',
+            G: 'bg-amber-500',
+            U: 'bg-red-500',
+          };
+          
+          return (
+            <div className={`w-6 h-12 flex items-center justify-center font-bold text-white text-xs border border-slate-800 transition-all duration-200 ${colors[type]} ${active ? 'scale-110 shadow-[0_0_10px_rgba(255,255,255,0.8)] z-10' : 'opacity-80'}`}>
+              {type}
+            </div>
+          );
+        };
+
+        const App = () => {
+          const [targetTime, setTargetTime] = useState(1500);
+          const [phase, setPhase] = useState('idle'); 
+          const [tape, setTape] = useState([]);
+          const [readIndex, setReadIndex] = useState(-1);
+          const [elapsedTime, setElapsedTime] = useState(0);
+          
+          const animationRef = useRef(null);
+          const startTimeRef = useRef(null);
+
+          const msPerCodon = 50; 
+          const bases = ['A', 'C', 'G', 'U'];
+
+          const handleWrite = () => {
+            setPhase('writing');
+            setTape([]);
+            setReadIndex(-1);
+            setElapsedTime(0);
+            
+            const requiredCodons = Math.floor(targetTime / msPerCodon);
+            let currentLength = 0;
+
+            const writeInterval = setInterval(() => {
+              if (currentLength >= requiredCodons) {
+                clearInterval(writeInterval);
+                setPhase('written');
+              } else {
+                setTape(prev => [...prev, bases[Math.floor(Math.random() * bases.length)]]);
+                currentLength++;
+              }
+            }, 15); 
+          };
+
+          const handleRead = () => {
+            setPhase('reading');
+            startTimeRef.current = performance.now();
+            setReadIndex(0);
+            
+            const readStep = (timestamp) => {
+              const elapsed = timestamp - startTimeRef.current;
+              setElapsedTime(elapsed);
+              
+              const currentIndex = Math.floor(elapsed / msPerCodon);
+              
+              if (currentIndex < tape.length) {
+                setReadIndex(currentIndex);
+                animationRef.current = requestAnimationFrame(readStep);
+              } else {
+                setPhase('action');
+                setReadIndex(-1);
+              }
+            };
+            
+            animationRef.current = requestAnimationFrame(readStep);
+          };
+
+          const handleReset = () => {
+            setPhase('idle');
+            setTape([]);
+            setReadIndex(-1);
+            setElapsedTime(0);
+            if (animationRef.current) cancelAnimationFrame(animationRef.current);
+          };
+
+          useEffect(() => {
+            return () => {
+              if (animationRef.current) cancelAnimationFrame(animationRef.current);
+            };
+          }, []);
+
+          return (
+            <div className="flex flex-col items-center justify-center p-6 bg-slate-900 min-h-screen font-sans text-slate-200">
+              <div className="bg-slate-800 p-8 rounded-xl shadow-2xl w-full max-w-5xl border border-slate-700">
+                
+                <div className="mb-8 border-b border-slate-700 pb-6">
+                  <h1 className="text-3xl font-bold text-white mb-2">The Molecular Turing Tape</h1>
+                  <p className="text-slate-400 leading-relaxed">
+                    Gallistel's critique of connectionism: A synapse cannot store a specific number. To encode a precise temporal interval, the brain requires an addressable read/write memory. The interval is explicitly "written" into an intracellular polynucleotide string (like RNA) and subsequently "read" by molecular machinery to time the motor response.
+                  </p>
+                </div>
+
+                <div className="flex gap-6 mb-8">
+                  <div className="bg-slate-900 p-4 rounded-lg border border-slate-700 flex-1 flex flex-col justify-center">
+                    <span className="font-semibold text-slate-400 mb-2 text-sm uppercase tracking-wider">Encode Interval (Write Phase)</span>
+                    <div className="flex items-center gap-4">
+                      <input 
+                        type="number" 
+                        value={targetTime}
+                        onChange={(e) => setTargetTime(Number(e.target.value))}
+                        disabled={phase !== 'idle' && phase !== 'written'}
+                        className="w-28 px-3 py-2 bg-slate-800 border border-slate-600 rounded text-right font-mono text-emerald-400 font-bold focus:outline-none focus:border-emerald-500 disabled:opacity-50"
+                        step="100"
+                        min="100"
+                        max="5000"
+                      />
+                      <span className="text-slate-500 font-mono">ms</span>
+                      <button 
+                        onClick={handleWrite}
+                        disabled={phase === 'writing' || phase === 'reading'}
+                        className="ml-auto px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 text-white font-bold rounded shadow transition-colors"
+                      >
+                        Synthesize Molecule
+                      </button>
+                    </div>
+                  </div>
+                  
+                  <div className="bg-slate-900 p-4 rounded-lg border border-slate-700 flex-1 flex flex-col justify-center">
+                    <span className="font-semibold text-slate-400 mb-2 text-sm uppercase tracking-wider">Execute Action (Read Phase)</span>
+                    <div className="flex items-center gap-4">
+                      <div className="font-mono text-2xl text-blue-400">
+                        {(elapsedTime / 1000).toFixed(2)}s
+                      </div>
+                      <button 
+                        onClick={handleRead}
+                        disabled={phase !== 'written'}
+                        className="ml-auto px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 text-white font-bold rounded shadow transition-colors"
+                      >
+                        Transcribe & Execute
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="relative w-full h-64 bg-slate-950 border-2 border-slate-700 rounded-lg overflow-hidden mb-6 flex flex-col items-center justify-center p-4">
+                  
+                  {phase === 'idle' && (
+                    <div className="text-slate-600 font-mono text-lg animate-pulse">
+                      Awaiting sensory input to begin synthesis...
+                    </div>
+                  )}
+
+                  {(phase === 'writing' || phase === 'written' || phase === 'reading' || phase === 'action') && (
+                    <div className="relative w-full overflow-hidden flex flex-col items-center">
+                      
+                      <div className={`absolute top-0 text-emerald-500 font-mono text-xs font-bold transition-opacity ${phase === 'writing' ? 'opacity-100' : 'opacity-0'}`}>
+                        [ POLYMERASE SYNTHESIZING... ]
+                      </div>
+
+                      <div className="absolute top-1/2 -mt-10 left-0 w-full flex justify-center pointer-events-none z-20">
+                        <div 
+                          className={`w-12 h-20 border-4 border-white/50 bg-white/10 rounded-lg transition-opacity duration-300 flex items-start justify-center pt-1 ${phase === 'reading' ? 'opacity-100' : 'opacity-0'}`}
+                          style={{ 
+                            transform: `translateX(${(readIndex - (tape.length/2)) * 24}px)`,
+                            transition: phase === 'reading' ? 'transform 50ms linear' : 'none'
+                          }}
+                        >
+                          <div className="text-[10px] font-bold text-white bg-slate-900 px-1 rounded-sm mt-[-16px]">READ</div>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap justify-center items-center mt-6 gap-0 px-8 max-w-full">
+                        {tape.map((base, idx) => (
+                          <Nucleotide 
+                            key={idx} 
+                            type={base} 
+                            active={idx === readIndex} 
+                          />
+                        ))}
+                      </div>
+
+                    </div>
+                  )}
+
+                  {phase === 'action' && (
+                    <div className="absolute inset-0 bg-red-500/20 flex flex-col items-center justify-center backdrop-blur-sm z-30">
+                      <h2 className="text-4xl font-black text-red-500 tracking-widest drop-shadow-lg">MOTOR ACTION TRIGGERED</h2>
+                      <p className="text-white font-mono mt-2">Tape reading complete at {(elapsedTime/1000).toFixed(2)}s</p>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex justify-between items-center bg-slate-900 p-4 rounded-lg border-l-4 border-blue-500">
+                  <p className="text-sm text-slate-300 w-3/4">
+                    <strong className="text-blue-400">Theoretical Takeaway:</strong> Notice that the synapse is irrelevant here. The interval is stored symbolically as the length/sequence of an intracellular string. Learning is not adjusting a weight; it is writing a discrete variable to a molecular hard drive.
+                  </p>
+                  <button 
+                    onClick={handleReset}
+                    className="px-6 py-2 bg-slate-700 hover:bg-slate-600 text-white font-semibold rounded transition-colors"
+                  >
+                    Reset System
+                  </button>
+                </div>
+
+              </div>
+            </div>
+          );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
